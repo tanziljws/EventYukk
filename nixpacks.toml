@@ -6,6 +6,7 @@ node = "20"
 
 [variables]
 NPM_CONFIG_IGNORE_SCRIPTS = "true"
+NODE_VERSION = "20"
 
 [phases.install]
 cmds = [
