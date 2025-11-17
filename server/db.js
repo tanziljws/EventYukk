@@ -1,6 +1,12 @@
 // db.js
 const mysql = require('mysql2');
-require('dotenv').config();
+// Load environment variables - try config.env first, then fallback to process.env (for Railway)
+try {
+  require('dotenv').config({ path: './config.env' });
+} catch (e) {
+  // If config.env doesn't exist (e.g., in Railway), use process.env directly
+  console.log('📝 Using environment variables from process.env (Railway/Production mode)');
+}
 
 // Create connection pool for better performance
 const pool = mysql.createPool({
