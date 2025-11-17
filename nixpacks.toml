@@ -11,9 +11,10 @@ NODE_VERSION = "20"
 [phases.install]
 cmds = [
   'export NPM_CONFIG_IGNORE_SCRIPTS=true',
-  'npm ci || true',
-  '(cd frontend && npm ci) || true',
-  '(cd server && npm ci) || true'
+  'npm config set ignore-scripts true',
+  'npm ci --ignore-scripts || true',
+  '(cd frontend && npm ci --ignore-scripts) || true',
+  '(cd server && npm ci --ignore-scripts) || true'
 ]
 
 [phases.build]
