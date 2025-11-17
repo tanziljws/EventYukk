@@ -4,11 +4,15 @@ nixPkgs = ['nodejs-20_x']
 [providers]
 node = "20"
 
+[variables]
+NPM_CONFIG_IGNORE_SCRIPTS = "true"
+
 [phases.install]
 cmds = [
-  'npm ci --ignore-scripts || true',
+  'export NPM_CONFIG_IGNORE_SCRIPTS=true',
+  'npm ci || true',
   '(cd frontend && npm ci) || true',
-  '(cd server && npm ci --ignore-scripts) || true'
+  '(cd server && npm ci) || true'
 ]
 
 [phases.build]
