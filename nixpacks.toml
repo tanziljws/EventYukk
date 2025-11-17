@@ -1,11 +1,14 @@
 [phases.setup]
 nixPkgs = ['nodejs-20_x']
 
+[variables]
+NODE_VERSION = "20"
+
 [phases.install]
 cmds = [
-  'npm ci',
+  'npm ci --ignore-scripts',
   '(cd frontend && npm ci)',
-  '(cd server && npm ci)'
+  '(cd server && npm ci --ignore-scripts)'
 ]
 
 [phases.build]
