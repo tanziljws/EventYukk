@@ -59,6 +59,18 @@ const generateCertificateNumber = (eventId, userId) => {
 
 const mapTemplateRow = (row) => {
   if (!row) return { ...DEFAULT_TEMPLATE };
+  
+  // Parse elements JSON if it exists
+  let elements = null;
+  if (row.elements) {
+    try {
+      elements = typeof row.elements === 'string' ? JSON.parse(row.elements) : row.elements;
+    } catch (e) {
+      console.error('Error parsing elements JSON:', e);
+      elements = null;
+    }
+  }
+  
   return {
     title: row.title || DEFAULT_TEMPLATE.title,
     subtitle: row.subtitle || DEFAULT_TEMPLATE.subtitle,
@@ -71,6 +83,10 @@ const mapTemplateRow = (row) => {
     logoPosition: row.logo_position || DEFAULT_TEMPLATE.logoPosition,
     signatureText: row.signature_text || DEFAULT_TEMPLATE.signatureText,
     certificateType: row.template_type || DEFAULT_TEMPLATE.certificateType,
+    // Canvas-based fields
+    backgroundImage: row.backgroundImage || null,
+    backgroundSize: row.backgroundSize || 'cover',
+    elements: elements || [],
   };
 };
 
@@ -231,11 +247,24 @@ router.get('/my-certificates', authenticateToken, requireUser, async (req, res) 
     return ApiResponse.success(res, { certificates: certs }, 'Certificates retrieved');
   } catch (error) {
     console.error('Get my certificates error:', error);
-    return ApiResponse.error(res, 'Failed to fetch certificates');
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    return ApiResponse.error(res, error.message || 'Failed to fetch certificates');
   }
 });
 
-// Get certificate by id
+// Get certificate template (admin only) - MUST be before /:id route
+router.get('/template', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const template = await getActiveTemplate();
+    return ApiResponse.success(res, template);
+  } catch (error) {
+    console.error('Get template error:', error);
+    return ApiResponse.error(res, 'Failed to fetch template');
+  }
+});
+
+// Get certificate by id - MUST be after specific routes like /template
 router.get('/:id', authenticateToken, requireUser, async (req, res) => {
   try {
     const { id } = req.params;
@@ -252,7 +281,162 @@ router.get('/:id', authenticateToken, requireUser, async (req, res) => {
   }
 });
 
-// Update certificate customization (user can customize their own certificate)
+// Get template placeholders - MUST be before /:id route
+router.get('/template/placeholders', authenticateToken, requireAdmin, (req, res) => {
+  const placeholders = Object.entries(PLACEHOLDERS).map(([token, description]) => ({
+    token: `[${token}]`,
+    description,
+  }));
+  return ApiResponse.success(res, { placeholders });
+});
+
+// Update certificate template (admin only) - MUST be before /:id route
+router.put('/template', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const {
+      title,
+      subtitle,
+      content,
+      footer,
+      backgroundColor,
+      primaryColor,
+      accentColor,
+      textColor,
+      logoPosition,
+      signatureText,
+      certificateType,
+      // Canvas-based fields
+      backgroundImage,
+      backgroundSize,
+      elements
+    } = req.body;
+
+    const [existing] = await query(
+      'SELECT * FROM certificate_templates WHERE is_active = 1 ORDER BY id DESC LIMIT 1'
+    );
+
+    // Prepare elements JSON
+    let elementsJson = null;
+    if (elements && Array.isArray(elements)) {
+      elementsJson = JSON.stringify(elements);
+    }
+
+    if (!existing.length) {
+      const [result] = await query(
+        `INSERT INTO certificate_templates 
+         (template_name, template_type, title, subtitle, content, footer_text, background_color, primary_color, accent_color, text_color, logo_position, signature_text, backgroundImage, backgroundSize, elements, is_default, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          'Default Template',
+          certificateType || DEFAULT_TEMPLATE.certificateType,
+          title || DEFAULT_TEMPLATE.title,
+          subtitle || DEFAULT_TEMPLATE.subtitle,
+          content || DEFAULT_TEMPLATE.content,
+          footer || DEFAULT_TEMPLATE.footer,
+          backgroundColor || DEFAULT_TEMPLATE.backgroundColor,
+          primaryColor || DEFAULT_TEMPLATE.primaryColor,
+          accentColor || DEFAULT_TEMPLATE.accentColor,
+          textColor || DEFAULT_TEMPLATE.textColor,
+          logoPosition || DEFAULT_TEMPLATE.logoPosition,
+          signatureText || DEFAULT_TEMPLATE.signatureText,
+          backgroundImage || null,
+          backgroundSize || 'cover',
+          elementsJson,
+          1,
+          1,
+        ]
+      );
+
+      const [newTemplate] = await query('SELECT * FROM certificate_templates WHERE id = ?', [
+        result.insertId,
+      ]);
+
+      return ApiResponse.success(res, mapTemplateRow(newTemplate[0]), 'Template created successfully');
+    }
+
+    // Build update query dynamically to handle optional fields
+    const updateFields = [];
+    const updateValues = [];
+
+    if (title !== undefined) {
+      updateFields.push('title = ?');
+      updateValues.push(title);
+    }
+    if (subtitle !== undefined) {
+      updateFields.push('subtitle = ?');
+      updateValues.push(subtitle);
+    }
+    if (content !== undefined) {
+      updateFields.push('content = ?');
+      updateValues.push(content);
+    }
+    if (footer !== undefined) {
+      updateFields.push('footer_text = ?');
+      updateValues.push(footer);
+    }
+    if (backgroundColor !== undefined) {
+      updateFields.push('background_color = ?');
+      updateValues.push(backgroundColor);
+    }
+    if (primaryColor !== undefined) {
+      updateFields.push('primary_color = ?');
+      updateValues.push(primaryColor);
+    }
+    if (accentColor !== undefined) {
+      updateFields.push('accent_color = ?');
+      updateValues.push(accentColor);
+    }
+    if (textColor !== undefined) {
+      updateFields.push('text_color = ?');
+      updateValues.push(textColor);
+    }
+    if (logoPosition !== undefined) {
+      updateFields.push('logo_position = ?');
+      updateValues.push(logoPosition);
+    }
+    if (signatureText !== undefined) {
+      updateFields.push('signature_text = ?');
+      updateValues.push(signatureText);
+    }
+    if (certificateType !== undefined) {
+      updateFields.push('template_type = ?');
+      updateValues.push(certificateType);
+    }
+    if (backgroundImage !== undefined) {
+      updateFields.push('backgroundImage = ?');
+      updateValues.push(backgroundImage);
+    }
+    if (backgroundSize !== undefined) {
+      updateFields.push('backgroundSize = ?');
+      updateValues.push(backgroundSize);
+    }
+    if (elements !== undefined) {
+      updateFields.push('elements = ?');
+      updateValues.push(elementsJson);
+    }
+
+    updateFields.push('updated_at = CURRENT_TIMESTAMP');
+    updateValues.push(existing[0].id);
+
+    await query(
+      `UPDATE certificate_templates 
+       SET ${updateFields.join(', ')}
+       WHERE id = ?`,
+      updateValues
+    );
+
+    const [updatedTemplate] = await query('SELECT * FROM certificate_templates WHERE id = ?', [
+      existing[0].id,
+    ]);
+
+    return ApiResponse.success(res, mapTemplateRow(updatedTemplate[0]), 'Template updated successfully');
+  } catch (error) {
+    console.error('Update template error:', error);
+    return ApiResponse.error(res, 'Failed to update template');
+  }
+});
+
+// Update certificate customization (user can customize their own certificate) - MUST be after /template route
 router.put('/:id', authenticateToken, requireUser, async (req, res) => {
   try {
     const { id } = req.params;
@@ -279,108 +463,6 @@ router.put('/:id', authenticateToken, requireUser, async (req, res) => {
   } catch (error) {
     console.error('Update certificate error:', error);
     return ApiResponse.error(res, 'Failed to update certificate');
-  }
-});
-
-// Get certificate template (admin only)
-router.get('/template', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const template = await getActiveTemplate();
-    return ApiResponse.success(res, template);
-  } catch (error) {
-    console.error('Get template error:', error);
-    return ApiResponse.error(res, 'Failed to fetch template');
-  }
-});
-
-// Get template placeholders
-router.get('/template/placeholders', authenticateToken, requireAdmin, (req, res) => {
-  const placeholders = Object.entries(PLACEHOLDERS).map(([token, description]) => ({
-    token: `[${token}]`,
-    description,
-  }));
-  return ApiResponse.success(res, { placeholders });
-});
-
-// Update certificate template (admin only)
-router.put('/template', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const {
-      title,
-      subtitle,
-      content,
-      footer,
-      backgroundColor,
-      primaryColor,
-      accentColor,
-      textColor,
-      logoPosition,
-      signatureText,
-      certificateType
-    } = req.body;
-
-    const [existing] = await query(
-      'SELECT * FROM certificate_templates WHERE is_active = 1 ORDER BY id DESC LIMIT 1'
-    );
-
-    if (!existing.length) {
-      const [result] = await query(
-        `INSERT INTO certificate_templates 
-         (template_name, template_type, title, subtitle, content, footer_text, background_color, primary_color, accent_color, text_color, logo_position, signature_text, is_default, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          'Default Template',
-          certificateType || DEFAULT_TEMPLATE.certificateType,
-          title || DEFAULT_TEMPLATE.title,
-          subtitle || DEFAULT_TEMPLATE.subtitle,
-          content || DEFAULT_TEMPLATE.content,
-          footer || DEFAULT_TEMPLATE.footer,
-          backgroundColor || DEFAULT_TEMPLATE.backgroundColor,
-          primaryColor || DEFAULT_TEMPLATE.primaryColor,
-          accentColor || DEFAULT_TEMPLATE.accentColor,
-          textColor || DEFAULT_TEMPLATE.textColor,
-          logoPosition || DEFAULT_TEMPLATE.logoPosition,
-          signatureText || DEFAULT_TEMPLATE.signatureText,
-          1,
-          1,
-        ]
-      );
-
-      const [newTemplate] = await query('SELECT * FROM certificate_templates WHERE id = ?', [
-        result.insertId,
-      ]);
-
-      return ApiResponse.success(res, mapTemplateRow(newTemplate[0]), 'Template created successfully');
-    }
-
-    await query(
-      `UPDATE certificate_templates 
-       SET title = ?, subtitle = ?, content = ?, footer_text = ?, background_color = ?, primary_color = ?, accent_color = ?, text_color = ?, logo_position = ?, signature_text = ?, template_type = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`,
-      [
-        title || existing[0].title,
-        subtitle || existing[0].subtitle,
-        content || existing[0].content,
-        footer || existing[0].footer_text,
-        backgroundColor || existing[0].background_color,
-        primaryColor || existing[0].primary_color,
-        accentColor || existing[0].accent_color,
-        textColor || existing[0].text_color,
-        logoPosition || existing[0].logo_position,
-        signatureText || existing[0].signature_text,
-        certificateType || existing[0].template_type,
-        existing[0].id,
-      ]
-    );
-
-    const [updatedTemplate] = await query('SELECT * FROM certificate_templates WHERE id = ?', [
-      existing[0].id,
-    ]);
-
-    return ApiResponse.success(res, mapTemplateRow(updatedTemplate[0]), 'Template updated successfully');
-  } catch (error) {
-    console.error('Update template error:', error);
-    return ApiResponse.error(res, 'Failed to update template');
   }
 });
 

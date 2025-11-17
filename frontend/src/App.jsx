@@ -37,6 +37,7 @@ import RegistrationsManagement from './pages/admin/RegistrationsManagement';
 import Analytics from './pages/admin/Analytics';
 import StatisticsDashboard from './pages/admin/StatisticsDashboard';
 import CertificateManagement from './pages/admin/CertificateManagement';
+import CertificateTemplateEditor from './pages/admin/CertificateTemplateEditor';
 import BlogManagement from './pages/admin/BlogManagement';
 import ReviewsManagement from './pages/admin/ReviewsManagement';
 import ReportsManagement from './pages/admin/ReportsManagement';
@@ -139,6 +140,7 @@ const AnimatedRoutes = () => {
             <Route path="analytics" element={<Analytics />} />
             <Route path="statistics" element={<StatisticsDashboard />} />
             <Route path="certificates" element={<CertificateManagement />} />
+            <Route path="certificates/template/:eventId" element={<CertificateTemplateEditor />} />
             <Route path="blogs" element={<BlogManagement />} />
             <Route path="reviews" element={<ReviewsManagement />} />
             <Route path="reports" element={<ReportsManagement />} />

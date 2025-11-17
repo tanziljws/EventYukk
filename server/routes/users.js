@@ -64,15 +64,18 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
       params.push(status === 'active' ? 1 : 0);
     }
 
+    // Use template literal for LIMIT/OFFSET
+    const limitNum = parseInt(limit) || 10;
+    const offsetNum = parseInt(offset) || 0;
     const [users] = await query(
       `SELECT id, username, email, full_name, phone, role, avatar, is_active, created_at, updated_at,
        (SELECT COUNT(*) FROM events WHERE organizer_id = users.id) as events_count,
-       (SELECT COUNT(*) FROM registrations WHERE user_id = users.id) as registrations_count
+       (SELECT COUNT(*) FROM event_registrations WHERE user_id = users.id) as registrations_count
        FROM users 
        WHERE ${whereClause} 
        ORDER BY created_at DESC 
-       LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), parseInt(offset)]
+       LIMIT ${limitNum} OFFSET ${offsetNum}`,
+      params
     );
 
     const [totalResult] = await query(
@@ -92,7 +95,9 @@ router.get('/', authenticateToken, requireAdmin, async (req, res) => {
 
   } catch (error) {
     console.error('Get users error:', error);
-    return ApiResponse.error(res, 'Failed to get users');
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    return ApiResponse.error(res, error.message || 'Failed to get users');
   }
 });
 
@@ -386,9 +391,14 @@ router.put('/change-password', authenticateToken, async (req, res) => {
       return ApiResponse.error(res, 'New password and confirm password do not match', 400);
     }
 
-    // Simple password validation - minimal 6 karakter
-    if (!new_password || new_password.length < 6) {
-      return ApiResponse.error(res, 'Password minimal 6 karakter', 400);
+    if (new_password.length < 8) {
+      return ApiResponse.error(res, 'Password must be at least 8 characters', 400);
+    }
+
+    // Validate password strength
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+    if (!passwordRegex.test(new_password)) {
+      return ApiResponse.error(res, 'Password must contain at least 8 characters with uppercase, lowercase, number, and special character', 400);
     }
 
     // Verify OTP

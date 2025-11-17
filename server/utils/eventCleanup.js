@@ -12,24 +12,25 @@ const markAbsentRegistrations = async () => {
       SELECT COLUMN_NAME 
       FROM INFORMATION_SCHEMA.COLUMNS 
       WHERE TABLE_NAME = 'registrations' 
-      AND COLUMN_NAME IN ('attendance_required', 'attendance_status', 'attendance_deadline')
+      AND COLUMN_NAME IN ('attendance_required', 'attendance_status')
     `);
     
-    const hasAttendanceColumns = columns.length === 3;
+    const hasAttendanceColumns = columns.length >= 2;
     
     if (!hasAttendanceColumns) {
       console.log('⚠️ Attendance columns not found in registrations table. Using event_registrations table instead.');
       
-      // Use event_registrations table which should have the columns
+      // Use event_registrations table - check if event has ended and user hasn't attended
       const now = new Date();
       const [absentRegistrations] = await query(`
-        SELECT er.id, er.user_id, er.event_id, er.attendance_deadline, e.title as event_title
+        SELECT er.id, er.user_id, er.event_id, e.title as event_title,
+               COALESCE(e.end_date, e.event_date) as event_end_date,
+               COALESCE(e.end_time, '23:59:59') as event_end_time
         FROM event_registrations er
         INNER JOIN events e ON er.event_id = e.id
         WHERE er.attendance_required = TRUE
           AND er.attendance_status = 'pending'
-          AND er.attendance_deadline IS NOT NULL
-          AND er.attendance_deadline < ?
+          AND CONCAT(COALESCE(e.end_date, e.event_date), ' ', COALESCE(e.end_time, '23:59:59')) < ?
           AND er.status != 'cancelled'
       `, [now]);
       
@@ -81,15 +82,16 @@ const markAbsentRegistrations = async () => {
     // If columns exist, use the original query
     const now = new Date();
     
-    // Find registrations that passed attendance deadline but didn't attend
+    // Find registrations where event has ended but user hasn't attended
     const [absentRegistrations] = await query(`
-      SELECT r.id, r.user_id, r.event_id, r.attendance_deadline, e.title as event_title
+      SELECT r.id, r.user_id, r.event_id, e.title as event_title,
+             COALESCE(e.end_date, e.event_date) as event_end_date,
+             COALESCE(e.end_time, '23:59:59') as event_end_time
       FROM registrations r
       INNER JOIN events e ON r.event_id = e.id
       WHERE r.attendance_required = TRUE
         AND r.attendance_status = 'pending'
-        AND r.attendance_deadline IS NOT NULL
-        AND r.attendance_deadline < ?
+        AND CONCAT(COALESCE(e.end_date, e.event_date), ' ', COALESCE(e.end_time, '23:59:59')) < ?
         AND r.status != 'cancelled'
     `, [now]);
 

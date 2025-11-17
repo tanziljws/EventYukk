@@ -38,9 +38,9 @@ const ContactPage = () => {
     setMessage('');
 
     try {
-      // Use the contact endpoint that saves to database
-      const apiBaseUrl = getApiBaseUrl();
-      const response = await fetch(`${apiBaseUrl}/contact`, {
+      // Use the contacts endpoint (public POST route)
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${apiBaseUrl}/contacts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

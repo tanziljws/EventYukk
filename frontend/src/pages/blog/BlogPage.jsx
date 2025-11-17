@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { BookOpen, Lightbulb, Newspaper, Calendar, FileText, Search } from 'lucide-react';
 import Footer from '../../components/Footer';
 import { getApiBaseUrl, getServerBaseUrl } from '../../lib/utils';
+import { articlesAPI } from '../../services/api';
 
 const BlogPage = () => {
   const [articles, setArticles] = useState([]);
@@ -40,26 +41,25 @@ const BlogPage = () => {
   const fetchArticles = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
+      const params = {
         page: currentPage,
         limit: 9
-      });
+      };
       
       if (selectedCategory !== 'all') {
-        params.append('category', selectedCategory);
+        params.category = selectedCategory;
       }
       
       if (searchQuery) {
-        params.append('search', searchQuery);
+        params.search = searchQuery;
       }
 
-      const apiBaseUrl = getApiBaseUrl();
-      const response = await fetch(`${apiBaseUrl}/articles?${params}`);
-      const data = await response.json();
+      const response = await articlesAPI.getAll(params);
+      const data = response?.data || response;
 
       if (data.success) {
-        setArticles(data.data.articles);
-        setTotalPages(data.data.pagination.totalPages);
+        setArticles(data.data.articles || []);
+        setTotalPages(data.data.pagination?.totalPages || 0);
       }
     } catch (error) {
       console.error('Error fetching articles:', error);
@@ -70,14 +70,20 @@ const BlogPage = () => {
 
   const fetchFeaturedArticles = async () => {
     try {
-      const response = await fetch(`${apiBaseUrl}/articles/featured`);
-      const data = await response.json();
-
+      const response = await articlesAPI.getFeatured();
+      // Response interceptor returns response.data which is { success, message, data }
+      const data = response?.data || response;
+      
       if (data.success) {
-        setFeaturedArticles(data.data);
+        // Featured articles endpoint returns data directly as array
+        setFeaturedArticles(Array.isArray(data.data) ? data.data : []);
+      } else if (Array.isArray(data)) {
+        // If response is directly an array
+        setFeaturedArticles(data);
       }
     } catch (error) {
       console.error('Error fetching featured articles:', error);
+      setFeaturedArticles([]);
     }
   };
 

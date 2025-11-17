@@ -146,6 +146,9 @@ router.get('/', authenticateToken, requireRole(['admin']), async (req, res) => {
       queryParams.push(status);
     }
 
+    // Use template literal for LIMIT/OFFSET
+    const limitNum = parseInt(limit) || 20;
+    const offsetNum = parseInt(offset) || 0;
     const [contacts] = await query(`
       SELECT 
         c.*, 
@@ -154,8 +157,8 @@ router.get('/', authenticateToken, requireRole(['admin']), async (req, res) => {
       LEFT JOIN users u ON c.replied_by = u.id
       ${whereClause}
       ORDER BY c.created_at DESC
-      LIMIT ? OFFSET ?
-    `, [...queryParams, limit, offset]);
+      LIMIT ${limitNum} OFFSET ${offsetNum}
+    `, queryParams);
 
     const [countResult] = await query(`
       SELECT COUNT(*) as total FROM contacts ${whereClause}

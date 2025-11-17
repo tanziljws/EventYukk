@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import ConfirmModal from '../../components/ConfirmModal';
 import { Award, Download, FileText, Eye, Settings, Save, RotateCcw, Palette, Type, Image as ImageIcon, AlignCenter, Bold, Italic, Maximize2, Minus, Plus, Layout, Sparkles } from 'lucide-react';
-import { eventsAPI, certificatesAPI, registrationsAPI } from '../../services/api';
+import { eventsAPI, certificatesAPI, adminAPI } from '../../services/api';
 
 const CertificateManagement = () => {
   const toast = useToast();
@@ -66,7 +66,7 @@ const CertificateManagement = () => {
       }
     } catch (error) {
       console.error('Error fetching events:', error);
-      toast.show('Gagal memuat daftar event', 'error');
+      toast.error('Gagal memuat daftar event');
       setEvents([]);
     } finally {
       setLoading(false);
@@ -113,7 +113,7 @@ const CertificateManagement = () => {
       }
     } catch (error) {
       console.error('Error fetching template:', error);
-      toast.show('Gagal memuat template sertifikat', 'error');
+      toast.error('Gagal memuat template sertifikat');
     } finally {
       setTemplateLoading(false);
     }
@@ -121,14 +121,14 @@ const CertificateManagement = () => {
 
   const fetchParticipants = async (eventId) => {
     try {
-      const response = await registrationsAPI.getAll({ event_id: eventId, status: 'approved' });
+      const response = await adminAPI.getAllRegistrations({ event_id: eventId, status: 'confirmed' });
       if (response && response.data) {
         const participantsData = Array.isArray(response.data) ? response.data : response.data.registrations || [];
         setParticipants(participantsData);
       }
     } catch (error) {
       console.error('Error fetching participants:', error);
-      toast.show('Gagal memuat data peserta', 'error');
+      toast.error('Gagal memuat data peserta');
       setParticipants([]);
     }
   };
@@ -146,11 +146,11 @@ const CertificateManagement = () => {
     const participant = generateConfirm.participant;
     try {
       await certificatesAPI.generate(selectedEvent.id, participant.id || participant.user_id);
-      toast.show(`Sertifikat berhasil dibuat untuk ${participant.full_name || participant.user_name}`, 'success');
+      toast.success(`Sertifikat berhasil dibuat untuk ${participant.full_name || participant.user_name}`);
       setGenerateConfirm({ show: false, participant: null });
     } catch (error) {
       console.error('Error generating certificate:', error);
-      toast.show('Gagal membuat sertifikat', 'error');
+      toast.error('Gagal membuat sertifikat');
     }
   };
 
@@ -161,11 +161,11 @@ const CertificateManagement = () => {
   const confirmBulkGenerate = async () => {
     try {
       await certificatesAPI.generateBulk(selectedEvent.id);
-      toast.show(`Sertifikat berhasil dibuat untuk semua ${participants.length} peserta`, 'success');
+      toast.success(`Sertifikat berhasil dibuat untuk semua ${participants.length} peserta`);
       setBulkGenerateConfirm(false);
     } catch (error) {
       console.error('Error generating bulk certificates:', error);
-      toast.show('Gagal membuat sertifikat', 'error');
+      toast.error('Gagal membuat sertifikat');
     }
   };
 
@@ -173,12 +173,12 @@ const CertificateManagement = () => {
     try {
       setSaving(true);
       const response = await certificatesAPI.updateTemplate(certificateTemplate);
-      toast.show('Template sertifikat berhasil disimpan!', 'success');
+      toast.success('Template sertifikat berhasil disimpan!');
       // Reload template to get updated data
       await fetchTemplate();
     } catch (error) {
       console.error('Error saving template:', error);
-      toast.show('Gagal menyimpan template', 'error');
+      toast.error('Gagal menyimpan template');
     } finally {
       setSaving(false);
     }
@@ -550,17 +550,26 @@ const CertificateManagement = () => {
           </div>
 
           {/* Template Editor Toggle */}
-          <button
-            onClick={() => setShowTemplateEditor(!showTemplateEditor)}
-            className={`w-full px-4 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
-              showTemplateEditor
-                ? 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                : 'bg-black text-white hover:bg-gray-800'
-            }`}
-          >
-            <Settings className="w-5 h-5" />
-            {showTemplateEditor ? 'Sembunyikan Editor' : 'Edit Template Sertifikat'}
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={() => setShowTemplateEditor(!showTemplateEditor)}
+              className={`w-full px-4 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+                showTemplateEditor
+                  ? 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                  : 'bg-black text-white hover:bg-gray-800'
+              }`}
+            >
+              <Settings className="w-5 h-5" />
+              {showTemplateEditor ? 'Sembunyikan Editor' : 'Edit Template (Classic)'}
+            </button>
+            <a
+              href="/admin/certificates/template/0"
+              className="w-full px-4 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700"
+            >
+              <Palette className="w-5 h-5" />
+              Canvas Editor (Modern)
+            </a>
+          </div>
         </div>
 
         {/* Main Content Area */}

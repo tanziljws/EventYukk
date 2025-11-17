@@ -141,8 +141,7 @@ router.get('/summary', async (req, res) => {
       start_date && end_date ? [start_date, end_date] : []
     );
 
-    // Participant details
-    // event_registrations table doesn't have full_name, email, phone - get from users table
+    // Participant details - use users table for participant info
     const [participantDetails] = await query(
       `SELECT 
           u.full_name as name, 

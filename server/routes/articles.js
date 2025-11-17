@@ -15,19 +15,31 @@ router.get('/', async (req, res) => {
 
     let whereClause = 'WHERE a.status = "published"';
     let queryParams = [];
+    let countParams = [];
 
     if (category) {
       whereClause += ' AND a.category = ?';
       queryParams.push(category);
+      countParams.push(category);
     }
 
     if (search) {
       whereClause += ' AND (a.title LIKE ? OR a.excerpt LIKE ? OR a.content LIKE ?)';
       const searchTerm = `%${search}%`;
       queryParams.push(searchTerm, searchTerm, searchTerm);
+      countParams.push(searchTerm, searchTerm, searchTerm);
     }
 
-    // Get articles with author info
+    // Get total count for pagination first
+    const countQuery = `
+      SELECT COUNT(*) as total 
+      FROM articles a 
+      ${whereClause}
+    `;
+    const [countResult] = await query(countQuery, countParams);
+    const total = countResult[0]?.total || 0;
+
+    // Get articles with author info - use template literal for LIMIT/OFFSET
     const articlesQuery = `
       SELECT 
         a.id, a.title, a.slug, a.excerpt, a.featured_image, a.category, 
@@ -37,26 +49,25 @@ router.get('/', async (req, res) => {
       LEFT JOIN users u ON a.author_id = u.id
       ${whereClause}
       ORDER BY a.is_featured DESC, a.published_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT ${limit} OFFSET ${offset}
     `;
 
-    queryParams.push(limit, offset);
     const [articles] = await query(articlesQuery, queryParams);
 
-    // Get total count for pagination
-    const countQuery = `
-      SELECT COUNT(*) as total 
-      FROM articles a 
-      ${whereClause}
-    `;
-    const [countResult] = await query(countQuery, queryParams.slice(0, -2));
-    const total = countResult[0].total;
-
-    // Parse tags JSON
-    const parsedArticles = articles.map(article => ({
-      ...article,
-      tags: article.tags ? JSON.parse(article.tags) : []
-    }));
+    // Parse tags JSON safely
+    const parsedArticles = (articles || []).map(article => {
+      try {
+        return {
+          ...article,
+          tags: article.tags ? (typeof article.tags === 'string' ? JSON.parse(article.tags) : article.tags) : []
+        };
+      } catch (e) {
+        return {
+          ...article,
+          tags: []
+        };
+      }
+    });
 
     return ApiResponse.success(res, {
       articles: parsedArticles,
@@ -70,7 +81,9 @@ router.get('/', async (req, res) => {
 
   } catch (error) {
     console.error('Get articles error:', error);
-    return ApiResponse.error(res, 'Failed to fetch articles');
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    return ApiResponse.error(res, error.message || 'Failed to fetch articles');
   }
 });
 
@@ -89,16 +102,27 @@ router.get('/featured', async (req, res) => {
       LIMIT 6
     `);
 
-    const parsedArticles = articles.map(article => ({
-      ...article,
-      tags: article.tags ? JSON.parse(article.tags) : []
-    }));
+    const parsedArticles = (articles || []).map(article => {
+      try {
+        return {
+          ...article,
+          tags: article.tags ? (typeof article.tags === 'string' ? JSON.parse(article.tags) : article.tags) : []
+        };
+      } catch (e) {
+        return {
+          ...article,
+          tags: []
+        };
+      }
+    });
 
     return ApiResponse.success(res, parsedArticles);
 
   } catch (error) {
     console.error('Get featured articles error:', error);
-    return ApiResponse.error(res, 'Failed to fetch featured articles');
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    return ApiResponse.error(res, error.message || 'Failed to fetch featured articles');
   }
 });
 
@@ -177,7 +201,7 @@ router.get('/category/:category', async (req, res) => {
       WHERE status = "published" AND category = ?
     `, [category]);
 
-    const total = countResult[0].total;
+    const total = countResult[0]?.total || 0;
 
     const parsedArticles = articles.map(article => ({
       ...article,

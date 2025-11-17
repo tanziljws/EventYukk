@@ -1146,7 +1146,7 @@ const HomePage = () => {
         </div>
 
         {/* CSS for floating animation */}
-        <style jsx>{`
+        <style>{`
           @keyframes float {
             0%, 100% {
               transform: translateY(0) translateX(0);

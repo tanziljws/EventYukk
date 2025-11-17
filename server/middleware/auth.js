@@ -31,12 +31,15 @@ const authenticateToken = async (req, res, next) => {
       }
     }
     
-    // Check session timeout - 5 minutes (skip for admin users)
+    // Check session timeout - 24 hours (skip for admin users)
+    // Note: JWT token itself has expiry (24h), so we don't need strict session timeout here
+    // Session timeout is handled in frontend AuthContext for user experience
     const now = Math.floor(Date.now() / 1000);
     const tokenAge = now - decoded.iat;
     
-    // Only check session timeout for non-admin users
-    if (tokenAge > 300 && decoded.role !== 'admin') { // 5 minutes = 300 seconds
+    // Only check session timeout for non-admin users (24 hours = 86400 seconds)
+    // This is more lenient - actual expiry is handled by JWT token expiry
+    if (tokenAge > 86400 && decoded.role !== 'admin') { // 24 hours = 86400 seconds
       return res.status(401).json({
         success: false,
         message: 'Session expired. Please login again.',

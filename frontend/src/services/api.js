@@ -163,6 +163,15 @@ export const certificatesAPI = {
   updateTemplate: (data) => api.put('/certificates/template', data),
 };
 
+// Articles API
+export const articlesAPI = {
+  getAll: (params) => api.get('/articles', { params }),
+  getById: (id) => api.get(`/articles/${id}`),
+  getBySlug: (slug) => api.get(`/articles/slug/${slug}`),
+  getFeatured: () => api.get('/articles/featured'),
+  getByCategory: (category, params) => api.get(`/articles/category/${category}`, { params }),
+};
+
 // Blogs API
 export const blogsAPI = {
   getAll: (params) => api.get('/blogs', { params }),

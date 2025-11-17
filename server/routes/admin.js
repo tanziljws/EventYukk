@@ -83,13 +83,15 @@ router.get('/users', async (req, res) => {
       params
     );
 
-    // Get users
+    // Get users - use template literal for LIMIT/OFFSET
+    const limitNum = parseInt(limit) || 10;
+    const offsetNum = parseInt(offset) || 0;
     const [users] = await query(
       `SELECT id, username, email, full_name, phone, role, is_active, created_at, updated_at 
        FROM users ${whereClause} 
        ORDER BY created_at DESC 
-       LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), offset]
+       LIMIT ${limitNum} OFFSET ${offsetNum}`,
+      params
     );
 
     const result = {
@@ -106,7 +108,9 @@ router.get('/users', async (req, res) => {
 
   } catch (error) {
     console.error('Get users error:', error);
-    return ApiResponse.error(res, 'Failed to get users');
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    return ApiResponse.error(res, error.message || 'Failed to get users');
   }
 });
 
@@ -226,7 +230,9 @@ router.get('/events', async (req, res) => {
       params
     );
 
-    // Get events with category info
+    // Get events with category info - use template literal for LIMIT/OFFSET
+    const limitNum = parseInt(limit) || 10;
+    const offsetNum = parseInt(offset) || 0;
     const [events] = await query(
       `SELECT e.*, c.name as category_name, 
               (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id) as registration_count
@@ -234,8 +240,8 @@ router.get('/events', async (req, res) => {
        LEFT JOIN categories c ON e.category_id = c.id 
        ${whereClause}
        ORDER BY e.created_at DESC 
-       LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), offset]
+       LIMIT ${limitNum} OFFSET ${offsetNum}`,
+      params
     );
 
     const result = {
@@ -252,14 +258,16 @@ router.get('/events', async (req, res) => {
 
   } catch (error) {
     console.error('Get events error:', error);
-    return ApiResponse.error(res, 'Failed to get events');
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    return ApiResponse.error(res, error.message || 'Failed to get events');
   }
 });
 
 // Get all registrations
 router.get('/registrations', async (req, res) => {
   try {
-    const { page = 1, limit = 10, event_id = '', status = '', search = '' } = req.query;
+    const { page = 1, limit = 10, event_id = '', status = '' } = req.query;
     const offset = (page - 1) * limit;
 
     let whereClause = 'WHERE 1=1';
@@ -275,48 +283,43 @@ router.get('/registrations', async (req, res) => {
       params.push(status);
     }
 
-    // Search by user name or email
-    if (search) {
-      whereClause += ' AND (u.full_name LIKE ? OR u.email LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`);
-    }
-
-    // Get total count - need to join users table for search
+    // Get total count
     const [countResult] = await query(
-      `SELECT COUNT(*) as total 
-       FROM event_registrations r
-       LEFT JOIN users u ON r.user_id = u.id
-       ${whereClause}`,
+      `SELECT COUNT(*) as total FROM event_registrations r ${whereClause}`,
       params
     );
 
     // Get registrations with event and user info
-    // event_registrations table doesn't have full_name, email, phone - get from users table
-    // users table only has: id, username, email, password, full_name, phone, role, avatar, is_active, address, education
-    // users table does NOT have: city, province, institution
+    // Use columns from users table only (event_registrations may not have participant fields)
+    const limitNum = parseInt(limit) || 10;
+    const offsetNum = parseInt(offset) || 0;
+    // Only select columns that definitely exist in event_registrations
+    // Based on minimal INSERT: user_id, event_id, payment_method, payment_amount, payment_status, status
     const [registrations] = await query(
-      `SELECT r.*, 
+      `SELECT r.id,
+              r.user_id,
+              r.event_id,
+              r.status,
+              r.payment_status,
+              r.payment_method,
+              r.payment_amount,
+              r.created_at,
               e.title as event_title, 
               e.event_date, 
               e.location,
               e.price as event_price,
               e.is_free,
-              u.full_name as user_name, 
-              u.email as user_email,
-              u.phone as user_phone,
-              u.full_name as full_name,
+              u.full_name as full_name, 
               u.email as email,
               u.phone as phone,
-              u.address,
-              u.education,
-              r.notes
+              u.address
        FROM event_registrations r
        LEFT JOIN events e ON r.event_id = e.id
        LEFT JOIN users u ON r.user_id = u.id
        ${whereClause}
-       ORDER BY COALESCE(r.created_at, r.id) DESC 
-       LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), offset]
+       ORDER BY r.created_at DESC 
+       LIMIT ${limitNum} OFFSET ${offsetNum}`,
+      params
     );
 
     const result = {
@@ -334,40 +337,9 @@ router.get('/registrations', async (req, res) => {
   } catch (error) {
     console.error('Get registrations error:', error);
     console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
     console.error('SQL State:', error.sqlState);
     return ApiResponse.error(res, `Failed to get registrations: ${error.message}`);
-  }
-});
-
-// Delete registration (admin only)
-router.delete('/registrations/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Check if registration exists
-    const [registrations] = await query(
-      'SELECT * FROM event_registrations WHERE id = ?',
-      [id]
-    );
-
-    if (registrations.length === 0) {
-      return ApiResponse.notFound(res, 'Registration not found');
-    }
-
-    const registration = registrations[0];
-
-    // Delete related data first (attendance tokens, certificates if any)
-    await query('DELETE FROM attendance_tokens WHERE user_id = ? AND event_id = ?', 
-      [registration.user_id, registration.event_id]);
-
-    // Delete registration
-    await query('DELETE FROM event_registrations WHERE id = ?', [id]);
-
-    return ApiResponse.success(res, null, 'Registration deleted successfully');
-
-  } catch (error) {
-    console.error('Delete registration error:', error);
-    return ApiResponse.error(res, 'Failed to delete registration');
   }
 });
 
@@ -579,8 +551,8 @@ router.get('/export/participants/:eventId', async (req, res) => {
       return ApiResponse.notFound(res, 'Event not found');
     }
 
-    // Get participants data from event_registrations
-    // event_registrations table doesn't have full_name, email, phone, address, city, province, institution - get from users table
+    // Get participants data from event_registrations (use users table for participant info)
+    // Only select columns that definitely exist
     const [participants] = await query(`
       SELECT 
         er.id,
@@ -589,12 +561,9 @@ router.get('/export/participants/:eventId', async (req, res) => {
         u.email as email,
         u.phone as phone,
         u.address,
-        u.education,
-        er.notes,
         er.status,
         er.payment_status,
         er.payment_amount,
-        er.attendance_status,
         er.created_at
       FROM event_registrations er
       LEFT JOIN users u ON er.user_id = u.id
@@ -609,7 +578,9 @@ router.get('/export/participants/:eventId', async (req, res) => {
       'Email': participant.email || '-',
       'No. Telepon': participant.phone || '-',
       'Alamat': participant.address || '-',
-      'Pendidikan': participant.education || '-',
+      'Kota': participant.city || '-',
+      'Provinsi': participant.province || '-',
+      'Institusi': participant.institution || '-',
       'Catatan': participant.notes || '-',
       'Status Pendaftaran': participant.status || 'pending',
       'Status Pembayaran': participant.payment_status || 'Belum Dibayar',
@@ -667,7 +638,7 @@ router.get('/export/events', async (req, res) => {
         e.status,
         c.name as category_name,
         (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id) as total_registrations,
-        (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'approved') as confirmed_registrations,
+        (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'confirmed') as confirmed_registrations,
         e.created_at
       FROM events e
       LEFT JOIN categories c ON e.category_id = c.id

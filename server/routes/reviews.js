@@ -17,7 +17,9 @@ const requireAdmin = (req, res, next) => {
 router.get('/', async (req, res) => {
   try {
     const { limit = 50, page = 1 } = req.query;
-    const offset = (page - 1) * limit;
+    const limitNum = parseInt(limit) || 50;
+    const pageNum = parseInt(page) || 1;
+    const offsetNum = (pageNum - 1) * limitNum;
 
     const [reviews] = await query(
       `SELECT r.*, u.username 
@@ -25,8 +27,7 @@ router.get('/', async (req, res) => {
        LEFT JOIN users u ON r.user_id = u.id 
        WHERE r.is_approved = TRUE 
        ORDER BY r.created_at DESC 
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), offset]
+       LIMIT ${limitNum} OFFSET ${offsetNum}`
     );
 
     const [countResult] = await query(
@@ -34,17 +35,19 @@ router.get('/', async (req, res) => {
     );
 
     return ApiResponse.success(res, {
-      reviews,
+      reviews: reviews || [],
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total: countResult[0].total,
-        total_pages: Math.ceil(countResult[0].total / limit)
+        page: pageNum,
+        limit: limitNum,
+        total: countResult[0]?.total || 0,
+        total_pages: Math.ceil((countResult[0]?.total || 0) / limitNum)
       }
     }, 'Reviews retrieved successfully');
   } catch (error) {
     console.error('Get reviews error:', error);
-    return ApiResponse.error(res, 'Failed to get reviews');
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    return ApiResponse.error(res, error.message || 'Failed to get reviews');
   }
 });
 
@@ -181,14 +184,16 @@ router.get('/admin/all', authenticateToken, requireAdmin, async (req, res) => {
       whereClause = 'r.is_approved = TRUE';
     }
 
+    // Use template literal for LIMIT/OFFSET
+    const limitNum = parseInt(limit) || 50;
+    const offsetNum = parseInt(offset) || 0;
     const [reviews] = await query(
       `SELECT r.*, u.username, u.email 
        FROM reviews r 
        LEFT JOIN users u ON r.user_id = u.id 
        WHERE ${whereClause}
        ORDER BY r.created_at DESC 
-       LIMIT ? OFFSET ?`,
-      [parseInt(limit), offset]
+       LIMIT ${limitNum} OFFSET ${offsetNum}`
     );
 
     const [countResult] = await query(

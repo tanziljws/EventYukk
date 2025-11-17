@@ -46,20 +46,23 @@ const upload = multer({
 router.get('/', async (req, res) => {
   try {
     const { page = 1, limit = 10, search = '', category_id = '', upcoming = '', sort_by = 'date_asc' } = req.query;
-    const offset = (page - 1) * limit;
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 10;
+    const offsetNum = (pageNum - 1) * limitNum;
 
     // Filter: only active events that are NOT archived
-    let whereClause = "WHERE e.is_active = 1 AND e.status != 'archived'";
+    let whereClause = "WHERE e.is_active = 1 AND (e.status IS NULL OR e.status != 'archived')";
     let params = [];
 
-    if (search) {
+    if (search && search.trim()) {
       whereClause += ' AND (e.title LIKE ? OR e.description LIKE ? OR e.location LIKE ?)';
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      const searchTerm = `%${search.trim()}%`;
+      params.push(searchTerm, searchTerm, searchTerm);
     }
 
-    if (category_id) {
+    if (category_id && category_id.trim()) {
       whereClause += ' AND e.category_id = ?';
-      params.push(category_id);
+      params.push(parseInt(category_id));
     }
 
     if (upcoming === 'true') {
@@ -97,9 +100,10 @@ router.get('/', async (req, res) => {
     );
 
     // Get events with category info and registration count
+    // Note: LIMIT and OFFSET must be integers, not placeholders in some MySQL versions
     const [events] = await query(
       `SELECT e.*, c.name as category_name, e.image as image_url,
-              (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'approved') as approved_registrations,
+              (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations,
               CASE 
                 WHEN e.event_date < NOW() THEN 'past'
                 WHEN e.event_date > NOW() THEN 'upcoming'
@@ -109,17 +113,17 @@ router.get('/', async (req, res) => {
        LEFT JOIN categories c ON e.category_id = c.id 
        ${whereClause}
        ${orderClause}
-       LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), offset]
+       LIMIT ${limitNum} OFFSET ${offsetNum}`,
+      params
     );
 
     const result = {
       events,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageNum,
+        limit: limitNum,
         total: countResult[0].total,
-        total_pages: Math.ceil(countResult[0].total / limit)
+        total_pages: Math.ceil(countResult[0].total / limitNum)
       }
     };
 
@@ -127,7 +131,9 @@ router.get('/', async (req, res) => {
 
   } catch (error) {
     console.error('Get events error:', error);
-    return ApiResponse.error(res, 'Failed to get events');
+    console.error('Error details:', error.message);
+    console.error('Error stack:', error.stack);
+    return ApiResponse.error(res, error.message || 'Failed to get events');
   }
 });
 
@@ -498,7 +504,7 @@ router.get('/upcoming/events', async (req, res) => {
     const { limit = 5 } = req.query;
 
     const [events] = await query(
-      `SELECT e.*, c.name as category_name, e.image as image_url,
+      `SELECT e.*, c.name as category_name,
               (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 
@@ -537,7 +543,7 @@ router.get('/category/:categoryId', async (req, res) => {
 
     // Get events
     const [events] = await query(
-      `SELECT e.*, c.name as category_name, e.image as image_url,
+      `SELECT e.*, c.name as category_name,
               (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 
@@ -586,7 +592,7 @@ router.get('/search/events', async (req, res) => {
 
     // Get events
     const [events] = await query(
-      `SELECT e.*, c.name as category_name, e.image as image_url,
+      `SELECT e.*, c.name as category_name,
               (SELECT COUNT(*) FROM event_registrations WHERE event_id = e.id AND status = 'confirmed') as approved_registrations
        FROM events e 
        LEFT JOIN categories c ON e.category_id = c.id 
