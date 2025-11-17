@@ -4,8 +4,8 @@ nixPkgs = ['nodejs-20_x']
 [phases.install]
 cmds = [
   'npm ci',
-  'cd frontend && npm ci',
-  'cd .. && cd server && npm ci'
+  '(cd frontend && npm ci)',
+  '(cd server && npm ci)'
 ]
 
 [phases.build]
