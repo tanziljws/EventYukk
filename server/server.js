@@ -148,24 +148,50 @@ app.use('/uploads', (req, res, next) => {
 }, express.static(path.join(__dirname, 'uploads')));
 
 // Serve frontend static files (if frontend is built and copied to server)
+// IMPORTANT: This must be BEFORE API routes to ensure static files are served correctly
 if (frontendDistPath) {
   // Serve static assets (CSS, JS, images, etc.) with proper MIME types
-  app.use(express.static(frontendDistPath, {
-    maxAge: '1y', // Cache static assets for 1 year
+  // Use explicit path matching to avoid conflicts
+  app.use('/assets', (req, res, next) => {
+    // Log asset requests for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`📦 Serving asset: ${req.path}`);
+    }
+    next();
+  }, express.static(path.join(frontendDistPath, 'assets'), {
+    maxAge: '1y',
     etag: true,
     setHeaders: (res, filePath) => {
-      // Set proper MIME types
       if (filePath.endsWith('.js')) {
-        res.setHeader('Content-Type', 'application/javascript');
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
       } else if (filePath.endsWith('.css')) {
-        res.setHeader('Content-Type', 'text/css');
+        res.setHeader('Content-Type', 'text/css; charset=utf-8');
       }
-    }
+    },
+    fallthrough: false // Don't fall through to next middleware if file not found
   }));
   
-  // Serve frontend for all non-API routes (SPA routing)
-  // This must be AFTER all API routes are registered
-  // We'll add this at the end, before 404 handler
+  // Serve other static files (manifest, icons, etc.) - but NOT index.html
+  app.use(express.static(frontendDistPath, {
+    maxAge: '1y',
+    etag: true,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      } else if (filePath.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css; charset=utf-8');
+      } else if (filePath.endsWith('.json')) {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      } else if (filePath.endsWith('.svg')) {
+        res.setHeader('Content-Type', 'image/svg+xml');
+      }
+    },
+    // Don't serve index.html here - we'll handle it in SPA routing
+    index: false,
+    fallthrough: true // Allow fallthrough for SPA routing
+  }));
+  
+  console.log(`✅ Frontend static files configured from: ${frontendDistPath}`);
 } else {
   console.log('⚠️ Frontend dist not found - API only mode');
 }
@@ -225,6 +251,7 @@ app.use('/api/admin/reports', reportsRoutes);
 console.log('✅ Reports routes registered at /api/admin/reports');
 
 // Serve frontend SPA for all non-API routes (must be after all API routes)
+// IMPORTANT: This must be LAST, after all static file serving
 if (frontendDistPath) {
   app.get('*', (req, res, next) => {
     // Skip API routes
@@ -235,8 +262,18 @@ if (frontendDistPath) {
     if (req.path.startsWith('/uploads/')) {
       return next();
     }
+    // Skip static assets (they should be served by express.static above)
+    if (req.path.startsWith('/assets/') || 
+        req.path.startsWith('/vite.svg') || 
+        req.path.startsWith('/manifest.json') ||
+        req.path.endsWith('.js') ||
+        req.path.endsWith('.css') ||
+        req.path.endsWith('.json')) {
+      return next();
+    }
     // Serve index.html for all other routes (SPA routing)
-    res.sendFile(path.join(frontendDistPath, 'index.html'), (err) => {
+    const indexPath = path.join(frontendDistPath, 'index.html');
+    res.sendFile(indexPath, (err) => {
       if (err) {
         console.error('Error serving index.html:', err);
         next();
