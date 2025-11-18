@@ -27,6 +27,9 @@ COPY . .
 # Build frontend
 RUN cd frontend && npm run build || echo "Frontend build skipped"
 
+# Copy frontend build to server directory for serving
+RUN mkdir -p server/frontend-dist && cp -r frontend/dist/* server/frontend-dist/ || echo "Frontend dist copy skipped"
+
 # Expose port (Railway will set PORT automatically)
 EXPOSE 3000
 

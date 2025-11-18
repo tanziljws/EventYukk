@@ -19,7 +19,24 @@ const app = express();
 // Security middleware
 app.use(helmet());
 
-// CORS configuration - flexible for Railway deployment
+// Check for frontend dist path first (before CORS setup)
+const possibleFrontendPaths = [
+  path.join(__dirname, 'frontend-dist'), // Copied in Dockerfile
+  path.join(__dirname, '..', 'frontend', 'dist'), // Development path
+  path.join(__dirname, 'dist') // Alternative path
+];
+
+let frontendDistPath = null;
+for (const frontendPath of possibleFrontendPaths) {
+  if (require('fs').existsSync(frontendPath)) {
+    frontendDistPath = frontendPath;
+    console.log(`✅ Frontend found at: ${frontendPath}`);
+    break;
+  }
+}
+
+// CORS configuration - Single domain approach (frontend served from backend)
+// If frontend is served from same domain, CORS is not needed for same-origin requests
 const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
@@ -27,40 +44,31 @@ const allowedOrigins = [
   'http://127.0.0.1:5174'
 ];
 
-// Add FRONTEND_URL if set
+// Add FRONTEND_URL if set (for separate frontend deployment)
 if (process.env.FRONTEND_URL) {
   allowedOrigins.push(process.env.FRONTEND_URL);
 }
 
-// Add specific Railway frontend URL
-if (process.env.RAILWAY_FRONTEND_URL) {
-  allowedOrigins.push(process.env.RAILWAY_FRONTEND_URL);
-}
+// Check if frontend is served from same domain (single domain mode)
+const isSingleDomainMode = frontendDistPath !== null;
 
-// In production/Railway, allow Railway domains
-if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT) {
-  // Allow all Railway domains
+if (isSingleDomainMode) {
+  // Single domain mode: Frontend served from backend, no CORS needed for same-origin
+  console.log('🌐 Single domain mode: Frontend served from backend - CORS disabled for same-origin');
+  // Minimal CORS - only for external API calls if needed
   app.use(cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
+      // Same-origin requests don't send Origin header - allow them
       if (!origin) return callback(null, true);
       
-      // Check if origin is in allowed list
+      // Allow localhost for development
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
       
-      // Allow Railway domains
-      if (origin.includes('.railway.app')) {
-        return callback(null, true);
-      }
-      
-      // Allow custom domain if set
-      if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
-        return callback(null, true);
-      }
-      
-      callback(new Error('Not allowed by CORS'));
+      // In single domain mode, same-origin requests are automatically allowed
+      // Only allow explicit origins for external access
+      callback(null, true);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -74,20 +82,49 @@ if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT) {
     ]
   }));
 } else {
-  // Development: strict CORS
-  app.use(cors({
-    origin: allowedOrigins,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type', 
-      'Authorization', 
-      'Cache-Control', 
-      'Pragma', 
-      'Expires',
-      'X-Requested-With'
-    ]
-  }));
+  // Separate domain mode: Frontend and backend on different domains
+  console.log('🌐 Separate domain mode: CORS enabled');
+  if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT) {
+    app.use(cors({
+      origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+        if (origin.includes('.railway.app')) {
+          return callback(null, true);
+        }
+        if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
+          return callback(null, true);
+        }
+        callback(new Error('Not allowed by CORS'));
+      },
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: [
+        'Content-Type', 
+        'Authorization', 
+        'Cache-Control', 
+        'Pragma', 
+        'Expires',
+        'X-Requested-With'
+      ]
+    }));
+  } else {
+    app.use(cors({
+      origin: allowedOrigins,
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowedHeaders: [
+        'Content-Type', 
+        'Authorization', 
+        'Cache-Control', 
+        'Pragma', 
+        'Expires',
+        'X-Requested-With'
+      ]
+    }));
+  }
 }
 
 // Rate limiting - more generous for development
@@ -109,6 +146,29 @@ app.use('/uploads', (req, res, next) => {
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   next();
 }, express.static(path.join(__dirname, 'uploads')));
+
+// Serve frontend static files (if frontend is built and copied to server)
+if (frontendDistPath) {
+  // Serve static assets (CSS, JS, images, etc.) with proper MIME types
+  app.use(express.static(frontendDistPath, {
+    maxAge: '1y', // Cache static assets for 1 year
+    etag: true,
+    setHeaders: (res, filePath) => {
+      // Set proper MIME types
+      if (filePath.endsWith('.js')) {
+        res.setHeader('Content-Type', 'application/javascript');
+      } else if (filePath.endsWith('.css')) {
+        res.setHeader('Content-Type', 'text/css');
+      }
+    }
+  }));
+  
+  // Serve frontend for all non-API routes (SPA routing)
+  // This must be AFTER all API routes are registered
+  // We'll add this at the end, before 404 handler
+} else {
+  console.log('⚠️ Frontend dist not found - API only mode');
+}
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -164,12 +224,45 @@ app.use('/api/admin/reports', reportsRoutes);
 
 console.log('✅ Reports routes registered at /api/admin/reports');
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found'
+// Serve frontend SPA for all non-API routes (must be after all API routes)
+if (frontendDistPath) {
+  app.get('*', (req, res, next) => {
+    // Skip API routes
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    // Skip uploads
+    if (req.path.startsWith('/uploads/')) {
+      return next();
+    }
+    // Serve index.html for all other routes (SPA routing)
+    res.sendFile(path.join(frontendDistPath, 'index.html'), (err) => {
+      if (err) {
+        console.error('Error serving index.html:', err);
+        next();
+      }
+    });
   });
+}
+
+// 404 handler (only for API routes if frontend not found)
+app.use('*', (req, res) => {
+  // If it's an API route, return JSON error
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({
+      success: false,
+      message: 'Route not found'
+    });
+  }
+  // For non-API routes, if frontend not found, return 404
+  if (!frontendDistPath) {
+    return res.status(404).json({
+      success: false,
+      message: 'Route not found'
+    });
+  }
+  // Frontend should handle this, but just in case
+  res.status(404).send('Not found');
 });
 
 // Global error handler
