@@ -30,8 +30,8 @@ export default defineConfig({
       }
     },
     emptyOutDir: true,
-    // Minify for production
-    minify: 'terser'
+    // Minify for production (esbuild is default, no extra dependency needed)
+    minify: 'esbuild'
   },
   css: {
     // Ensure CSS is processed correctly
