@@ -1,0 +1,22 @@
+# ============================================
+# FRONTEND ENVIRONMENT VARIABLES (3 Variables)
+# Copy-paste ke Railway Dashboard → Frontend Service → Variables
+# ============================================
+
+# Backend API URL - REQUIRED (1)
+VITE_API_URL=https://eventyukk-production-16ba.up.railway.app/api
+
+# Environment - Optional (1)
+VITE_NODE_ENV=production
+
+# Custom Domain - Optional (1)
+VITE_APP_URL=https://your-custom-domain.com
+
+# ============================================
+# TOTAL: 1 Required, 2 Optional
+# ============================================
+# CATATAN:
+# - Hanya VITE_API_URL yang wajib di-set
+# - Pastikan URL menggunakan https:// dan ada /api di akhir
+# - Setelah set, Railway akan auto-redeploy frontend
+

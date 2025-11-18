@@ -1,0 +1,48 @@
+# ============================================
+# BACKEND ENVIRONMENT VARIABLES (28 Variables)
+# Copy-paste ke Railway Dashboard → Backend Service → Variables
+# ============================================
+
+# Database Configuration (5)
+DB_HOST=your-db-host.railway.app
+DB_USER=root
+DB_PASSWORD=your-db-password
+DB_NAME=event_db
+DB_PORT=3306
+
+# Server Configuration (2)
+PORT=3000
+NODE_ENV=production
+
+# JWT Configuration (2)
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production-min-32-chars
+JWT_EXPIRES_IN=24h
+
+# File Upload Configuration (2)
+UPLOAD_PATH=./uploads
+MAX_FILE_SIZE=5242880
+
+# Admin Seed Key (1)
+ADMIN_SEED_KEY=change-this-seed-key-for-security
+
+# SMTP Configuration - Gmail (7)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_gmail_app_password
+SMTP_FROM_NAME=Event Yukk Platform
+SMTP_FROM_EMAIL=your_email@gmail.com
+
+# Midtrans Payment Gateway (2)
+MIDTRANS_SERVER_KEY=SB-Mid-server-your-server-key-here
+MIDTRANS_CLIENT_KEY=SB-Mid-client-your-client-key-here
+
+# Frontend URL - PENTING untuk CORS! (2)
+FRONTEND_URL=https://cozy-peace-production-c210.up.railway.app
+RAILWAY_FRONTEND_URL=https://cozy-peace-production-c210.up.railway.app
+
+# ============================================
+# TOTAL: 23 Variables (28 jika dihitung dengan komentar)
+# ============================================
+
