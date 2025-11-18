@@ -1,0 +1,63 @@
+# ============================================
+# RAILWAY ENVIRONMENT VARIABLES - COMPLETE SETUP
+# Copy-paste langsung ke Railway Dashboard
+# ============================================
+
+# ============================================
+# BACKEND SERVICE VARIABLES (23 Variables)
+# Service: eventyukk-production-16ba.up.railway.app
+# ============================================
+
+# Database Configuration (5)
+DB_HOST=tramway.proxy.rlwy.net
+DB_USER=root
+DB_PASSWORD=TSXxCbhMUvaKVctRMutuYVWcxRFfngRD
+DB_NAME=railway
+DB_PORT=30040
+
+# Server Configuration (2)
+PORT=3000
+NODE_ENV=production
+
+# JWT Configuration (2)
+JWT_SECRET=eventyukk-super-secret-jwt-key-2025-production-min-32-chars
+JWT_EXPIRES_IN=24h
+
+# File Upload Configuration (2)
+UPLOAD_PATH=./uploads
+MAX_FILE_SIZE=5242880
+
+# Admin Seed Key (1)
+ADMIN_SEED_KEY=eventyukk-admin-seed-key-2025
+
+# SMTP Configuration - Gmail (7)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=abdul.mughni845@gmail.com
+SMTP_PASS=vagk gkjj htib wlbx
+SMTP_FROM_NAME=Event Yukk Platform
+SMTP_FROM_EMAIL=abdul.mughni845@gmail.com
+
+# Midtrans Payment Gateway (2)
+MIDTRANS_SERVER_KEY=SB-Mid-server-your-server-key-here
+MIDTRANS_CLIENT_KEY=SB-Mid-client-your-client-key-here
+
+# Frontend URL - PENTING untuk CORS! (2)
+FRONTEND_URL=https://cozy-peace-production-c210.up.railway.app
+RAILWAY_FRONTEND_URL=https://cozy-peace-production-c210.up.railway.app
+
+# ============================================
+# FRONTEND SERVICE VARIABLES (1 Variable)
+# Service: cozy-peace-production-c210.up.railway.app
+# ============================================
+
+VITE_API_URL=https://eventyukk-production-16ba.up.railway.app/api
+
+# ============================================
+# CATATAN:
+# - Backend: Set semua 23 variables di Backend Service
+# - Frontend: Set 1 variable (VITE_API_URL) di Frontend Service
+# - Setelah set, Railway akan auto-redeploy
+# ============================================
+
