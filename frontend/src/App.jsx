@@ -43,7 +43,8 @@ import ReviewsManagement from './pages/admin/ReviewsManagement';
 import ReportsManagement from './pages/admin/ReportsManagement';
 import ContactManagement from './pages/admin/ContactManagement';
 
-import './styles/theme.css';
+// Theme CSS sudah di-import di index.css
+// import './styles/theme.css';
 
 // Simple page transition animations CSS
 const pageTransitionStyles = `

@@ -3,6 +3,9 @@
 /* Import Animations */
 @import './styles/animations.css';
 
+/* Import Theme - Inline untuk menghindari 404 di production */
+@import './styles/theme.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -270,11 +273,8 @@
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
 }
 
-/* Import Space Theme */
-@import './styles/theme.css';
-
-/* Import AdminLTE Styles */
-@import './styles/admin.css';
+/* Theme CSS sudah di-import di atas */
+/* Admin CSS tidak ada - sudah di-handle oleh Tailwind dan custom styles di bawah */
 
 /* Additional AdminLTE Fixes */
 .admin-layout {
