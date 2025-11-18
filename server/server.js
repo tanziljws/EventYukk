@@ -32,6 +32,11 @@ if (process.env.FRONTEND_URL) {
   allowedOrigins.push(process.env.FRONTEND_URL);
 }
 
+// Add specific Railway frontend URL
+if (process.env.RAILWAY_FRONTEND_URL) {
+  allowedOrigins.push(process.env.RAILWAY_FRONTEND_URL);
+}
+
 // In production/Railway, allow Railway domains
 if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT) {
   // Allow all Railway domains
