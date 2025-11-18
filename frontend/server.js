@@ -18,7 +18,14 @@ const DIST_PATH = path.join(__dirname, 'dist');
 app.use(express.static(DIST_PATH, {
   maxAge: '1y',
   etag: true,
-  setHeaders: (res, filePath) => {
+  // Don't cache index.html - always serve fresh
+  setHeaders: (res, filePath, stat) => {
+    // Don't cache index.html
+    if (filePath.endsWith('index.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
     // Set proper MIME types untuk semua file types
     if (filePath.endsWith('.js')) {
       res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
