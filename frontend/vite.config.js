@@ -5,32 +5,36 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [
     react({
-      jsxRuntime: 'automatic', // Use new JSX transform
+      jsxRuntime: 'automatic',
       jsxImportSource: 'react'
     })
   ],
-  // Expose environment variables to frontend
   define: {
     'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL)
   },
   build: {
-    // Ensure all CSS is bundled
-    cssCodeSplit: false, // Bundle all CSS into single file
+    // CRITICAL: Bundle ALL CSS into single file - NO SPLITTING
+    cssCodeSplit: false,
+    // Force new hash on every build
     rollupOptions: {
       output: {
-        // Ensure consistent file naming
-        entryFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/index-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]'
+        assetFileNames: (assetInfo) => {
+          // Force CSS to single file
+          if (assetInfo.name && assetInfo.name.endsWith('.css')) {
+            return 'assets/index-[hash].css';
+          }
+          return 'assets/[name]-[hash].[ext]';
+        }
       }
     },
-    // Force rebuild to update hashes
-    emptyOutDir: true
+    emptyOutDir: true,
+    // Minify for production
+    minify: 'terser'
   },
-  // Prevent CSS from being split
   css: {
-    postcss: {
-      plugins: []
-    }
+    // Ensure CSS is processed correctly
+    devSourcemap: false
   }
 })
