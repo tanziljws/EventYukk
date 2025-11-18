@@ -23,6 +23,14 @@ export default defineConfig({
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]'
       }
+    },
+    // Force rebuild to update hashes
+    emptyOutDir: true
+  },
+  // Prevent CSS from being split
+  css: {
+    postcss: {
+      plugins: []
     }
   }
 })
