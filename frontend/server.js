@@ -22,6 +22,7 @@ app.use((req, res, next) => {
 });
 
 // Check if dist folder exists
+let buildReady = false;
 if (!existsSync(DIST_PATH)) {
   console.error(`❌ ERROR: dist folder not found at ${DIST_PATH}`);
   console.error(`📁 Current directory: ${__dirname}`);
@@ -33,7 +34,8 @@ if (!existsSync(DIST_PATH)) {
   }
   console.error(`\n⚠️  CRITICAL: Build may have failed!`);
   console.error(`Please check Railway build logs to ensure 'npm run build' succeeded.`);
-  process.exit(1);
+  console.error(`⚠️  Server will continue but will return errors for all requests.`);
+  buildReady = false;
 } else {
   console.log(`✅ dist folder found at: ${DIST_PATH}`);
   try {
@@ -43,39 +45,63 @@ if (!existsSync(DIST_PATH)) {
     const indexPath = path.join(DIST_PATH, 'index.html');
     if (!existsSync(indexPath)) {
       console.error(`❌ ERROR: index.html not found in dist folder!`);
-      process.exit(1);
-    }
-    
-    const assetsPath = path.join(DIST_PATH, 'assets');
-    if (existsSync(assetsPath)) {
-      const assetsFiles = readdirSync(assetsPath);
-      console.log(`📦 Files in assets (${assetsFiles.length} files):`, assetsFiles.slice(0, 10), assetsFiles.length > 10 ? '...' : '');
-      
-      // Check for critical files
-      const hasJS = assetsFiles.some(f => f.endsWith('.js'));
-      const hasCSS = assetsFiles.some(f => f.endsWith('.css'));
-      
-      if (!hasJS) {
-        console.error(`❌ WARNING: No JS files found in assets!`);
-      }
-      if (!hasCSS) {
-        console.error(`❌ WARNING: No CSS files found in assets!`);
-      }
-      
-      if (hasJS && hasCSS) {
-        console.log(`✅ Build verification: JS and CSS files found`);
-      }
+      buildReady = false;
     } else {
-      console.error(`❌ ERROR: assets folder not found in dist!`);
-      process.exit(1);
+      const assetsPath = path.join(DIST_PATH, 'assets');
+      if (existsSync(assetsPath)) {
+        const assetsFiles = readdirSync(assetsPath);
+        console.log(`📦 Files in assets (${assetsFiles.length} files):`, assetsFiles.slice(0, 10), assetsFiles.length > 10 ? '...' : '');
+        
+        // Check for critical files
+        const hasJS = assetsFiles.some(f => f.endsWith('.js'));
+        const hasCSS = assetsFiles.some(f => f.endsWith('.css'));
+        
+        if (!hasJS) {
+          console.error(`❌ WARNING: No JS files found in assets!`);
+        }
+        if (!hasCSS) {
+          console.error(`❌ WARNING: No CSS files found in assets!`);
+        }
+        
+        if (hasJS && hasCSS) {
+          console.log(`✅ Build verification: JS and CSS files found`);
+          buildReady = true;
+        } else {
+          buildReady = false;
+        }
+      } else {
+        console.error(`❌ ERROR: assets folder not found in dist!`);
+        buildReady = false;
+      }
     }
   } catch (err) {
     console.error(`❌ Error reading dist folder:`, err);
-    process.exit(1);
+    buildReady = false;
   }
 }
 
-// Serve static files dengan proper MIME types
+// If build is not ready, serve error page for all requests
+if (!buildReady) {
+  app.use('*', (req, res) => {
+    res.status(500).json({
+      error: 'Build not ready',
+      message: 'Frontend build failed or not found. Please check Railway build logs.',
+      distPath: DIST_PATH,
+      currentDir: __dirname
+    });
+  });
+  
+  app.listen(PORT, () => {
+    console.log(`⚠️  Frontend server running in ERROR MODE on port ${PORT}`);
+    console.log(`📁 Expected dist at: ${DIST_PATH}`);
+    console.log(`🌐 All requests will return build error`);
+  });
+  
+  // Exit early - don't continue with normal setup
+} else {
+  // Normal setup continues below...
+  
+  // Serve static files dengan proper MIME types
 // IMPORTANT: This must be before the catch-all route
 app.use(express.static(DIST_PATH, {
   maxAge: '1y',
@@ -209,5 +235,6 @@ app.listen(PORT, () => {
   } else {
     console.log(`✅ assets folder found`);
   }
-});
+  });
+}
 
