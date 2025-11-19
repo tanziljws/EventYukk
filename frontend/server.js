@@ -215,26 +215,26 @@ app.use((err, req, res, next) => {
   res.status(500).send('Internal server error');
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Frontend server running on port ${PORT}`);
-  console.log(`📁 Serving from: ${DIST_PATH}`);
-  console.log(`🌐 Open: http://localhost:${PORT}`);
-  
-  // Verify critical files exist
-  const indexPath = path.join(DIST_PATH, 'index.html');
-  const assetsPath = path.join(DIST_PATH, 'assets');
-  
-  if (!existsSync(indexPath)) {
-    console.error(`⚠️  WARNING: index.html not found at ${indexPath}`);
-  } else {
-    console.log(`✅ index.html found`);
-  }
-  
-  if (!existsSync(assetsPath)) {
-    console.error(`⚠️  WARNING: assets folder not found at ${assetsPath}`);
-  } else {
-    console.log(`✅ assets folder found`);
-  }
+  app.listen(PORT, () => {
+    console.log(`🚀 Frontend server running on port ${PORT}`);
+    console.log(`📁 Serving from: ${DIST_PATH}`);
+    console.log(`🌐 Open: http://localhost:${PORT}`);
+    
+    // Verify critical files exist
+    const indexPath = path.join(DIST_PATH, 'index.html');
+    const assetsPath = path.join(DIST_PATH, 'assets');
+    
+    if (!existsSync(indexPath)) {
+      console.error(`⚠️  WARNING: index.html not found at ${indexPath}`);
+    } else {
+      console.log(`✅ index.html found`);
+    }
+    
+    if (!existsSync(assetsPath)) {
+      console.error(`⚠️  WARNING: assets folder not found at ${assetsPath}`);
+    } else {
+      console.log(`✅ assets folder found`);
+    }
   });
 }
 
