@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Base path - use root for production
+  base: '/',
   plugins: [
     react({
       jsxRuntime: 'automatic',
@@ -31,7 +33,9 @@ export default defineConfig({
     },
     emptyOutDir: true,
     // Minify for production (esbuild is default, no extra dependency needed)
-    minify: 'esbuild'
+    minify: 'esbuild',
+    // Ensure assets are in assets folder
+    assetsDir: 'assets'
   },
   css: {
     // Ensure CSS is processed correctly
